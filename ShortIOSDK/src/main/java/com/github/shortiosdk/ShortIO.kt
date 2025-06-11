@@ -1,5 +1,7 @@
 package com.github.shortiosdk
 
+import android.content.Intent
+import android.net.Uri
 import com.github.shortiosdk.Helpers.StringOrIntSerializer
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
@@ -64,5 +66,11 @@ object ShortioSdk {
             }
             return ShortIOResult.Error(errorModel)
         }
+    }
+    
+    fun handleIntent(intent: Intent?): Uri? {
+        val uri = intent?.data ?: return null
+        if (uri.scheme.isNullOrEmpty()) return null
+        return uri
     }
 }
