@@ -202,8 +202,7 @@ To handle deep links via Short.io on Android, you'll need to set up Android App 
         
         <data
             android:scheme="https"
-            android:host="yourshortdomain.short.gy"
-	    android:pathPrefix="/" />
+            android:host="yourshortdomain.short.gy" />
     </intent-filter>
 </activity>
 ```
@@ -261,7 +260,8 @@ keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -sto
 ```kotlin
 override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
-    handleIntent(intent)
+    val result = ShortioSdk.handleIntent(intent)
+    Log.d("New Intent", "Host: ${result?.host}, Path: ${result?.path}")
 }
 ```
 
@@ -270,20 +270,8 @@ override fun onNewIntent(intent: Intent) {
 ```kotlin
 override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
-    handleIntent(intent)
-}
-```
-
-4. Create the `handleIntent()` method to extract the URL:
-
-```kotlin
-private fun handleIntent(intent: Intent) {
-     val data: Uri? = intent.data
-     data?.let {
-         val url = it.toString()
-         Log.d("DeepLink", "App opened via URL: $url")
-         // Add your handling logic here
-     }
+        val result = ShortioSdk.handleIntent(intent)
+    Log.d("New Intent", "Host: ${result?.host}, Path: ${result?.path}")
 }
 ```
 
