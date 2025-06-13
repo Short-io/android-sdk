@@ -1,12 +1,13 @@
 package com.github.shortiosdk
 
-import android.content.Intent
-import android.net.Uri
-import com.github.shortiosdk.Helpers.StringOrIntSerializer
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import com.google.gson.GsonBuilder
+import com.github.shortiosdk.Helpers.StringOrIntSerializer
+import android.content.Intent
+import android.net.Uri
+import com.github.shortiosdk.Model.UrlComponents
 
 
 object ShortioSdk {
@@ -68,9 +69,31 @@ object ShortioSdk {
         }
     }
     
-    fun handleIntent(intent: Intent?): Uri? {
-        val uri = intent?.data ?: return null
-        if (uri.scheme.isNullOrEmpty()) return null
-        return uri
+    fun handleIntent(intent: Intent): UrlComponents? {
+        val uri = intent.data ?: return null
+        val scheme = uri.scheme?.lowercase()
+        if (scheme != "http" && scheme != "https") return null
+
+        val host = uri.host ?: return null
+        val cleanPath = uri.path?.removePrefix("/") ?: ""
+        val query = uri.encodedQuery
+        val fragment = uri.fragment
+
+        val fullUri = Uri.Builder()
+            .scheme(scheme)
+            .authority(host)
+            .encodedPath(cleanPath)
+            .encodedQuery(query)
+            .fragment(fragment)
+            .build()
+
+        return UrlComponents(
+            scheme = scheme,
+            host = host,
+            path = cleanPath,
+            query = query,
+            fragment = fragment,
+            fullUrl = fullUri.toString()
+        )
     }
 }

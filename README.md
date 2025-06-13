@@ -260,8 +260,8 @@ keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -sto
 ```kotlin
 override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
-    val newIntentUrl = ShortioSdk.handleIntent(intent)
-    Log.d("New Intent", "Host: ${newIntentUrl?.host}, Path: ${newIntentUrl?.path}")
+    val result = ShortioSdk.handleIntent(intent)
+    Log.d("New Intent", "Host: ${result?.host}, Path: ${result?.path}")
 }
 ```
 
@@ -270,8 +270,8 @@ override fun onNewIntent(intent: Intent) {
 ```kotlin
 override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
-        val newIntentUrl = ShortioSdk.handleIntent(intent)
-    Log.d("New Intent", "Host: ${newIntentUrl?.host}, Path: ${newIntentUrl?.path}")
+        val result = ShortioSdk.handleIntent(intent)
+    Log.d("New Intent", "Host: ${result?.host}, Path: ${result?.path}")
 }
 ```
 
