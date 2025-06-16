@@ -7,7 +7,6 @@ import com.google.gson.GsonBuilder
 import com.github.shortiosdk.Helpers.StringOrIntSerializer
 import android.content.Intent
 import android.net.Uri
-import com.github.shortiosdk.Model.UrlComponents
 
 
 object ShortioSdk {

@@ -1,3 +1,5 @@
+package com.github.shortiosdk
+
 data class UrlComponents(
     val scheme: String?,
     val host: String?,
