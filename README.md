@@ -52,7 +52,7 @@ It will be:
 ```kotlin
 dependencies {
 	implementation("com.github.User:Repo:Tag") // Example
-	implementation("com.github.Short-io:android-sdk:v1.0.0") // Use this
+	implementation("com.github.Short-io:android-sdk:v1.0.4") // Use this
 }
 ```
 ### 3. Sync the Project
