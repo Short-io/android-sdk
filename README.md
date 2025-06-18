@@ -52,7 +52,7 @@ It will be:
 ```kotlin
 dependencies {
 	implementation("com.github.User:Repo:Tag") // Example
-	implementation("com.github.Short-io:android-sdk:v1.0.4") // Use this
+	implementation("com.github.Short-io:android-sdk:v1.0.5") // Use this
 }
 ```
 ### 3. Sync the Project
@@ -104,11 +104,11 @@ thread {
     try {
         when (val result = ShortioSdk.shortenUrl(apiKey, params)) {
             is ShortIOResult.Success -> {
-                println("Shortened URL: ${result.data.shortURL}")
+                Log.d("ShortIOResult","Shortened URL: ${result.data.shortURL}")
             }
             is ShortIOResult.Error -> {
                 val error = result.data
-                println("Error ${error.statusCode}: ${error.message} (code: ${error.code})")
+                Log.d("ShortIOResult","Error ${error.statusCode}: ${error.message} (code: ${error.code})")
             }
         }
     } catch (e: Exception) {

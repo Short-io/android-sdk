@@ -1,6 +1,5 @@
 package com.github.shortiosdk
 
-
 data class ShortIOParameters(
     val originalURL: String,
     val cloaking: Boolean? = null,
