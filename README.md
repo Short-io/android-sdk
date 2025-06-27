@@ -52,7 +52,7 @@ It will be:
 ```kotlin
 dependencies {
 	implementation("com.github.User:Repo:Tag") // Example
-	implementation("com.github.Short-io:android-sdk:v1.0.5") // Use this
+	implementation("com.github.Short-io:android-sdk:v1.0.6") // Use this
 }
 ```
 ### 3. Sync the Project
@@ -241,7 +241,7 @@ keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -sto
 
 3. Tap on **“Add link”** under the **Open by Default** section.
 
-4. Add your URL and make sure to enable the checkbox for your link.
+4. Add your URL if not added and make sure to enable the checkbox for your link.
 
 ### 🔗 Step 4: Open the App Using a Deep Link
 
@@ -260,8 +260,10 @@ keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -sto
 ```kotlin
 override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
-    val result = ShortioSdk.handleIntent(intent)
-    Log.d("New Intent", "Host: ${result?.host}, Path: ${result?.path}")
+    lifecycleScope.launch {
+        val result = ShortioSdk.handleIntent(intent)
+        Log.d("New Intent", "Host: ${result?.host}, Path: ${result?.path}")
+    }
 }
 ```
 
@@ -270,13 +272,26 @@ override fun onNewIntent(intent: Intent) {
 ```kotlin
 override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    lifecycleScope.launch {
         val result = ShortioSdk.handleIntent(intent)
-    Log.d("New Intent", "Host: ${result?.host}, Path: ${result?.path}")
+        Log.d("New Intent", "Host: ${result?.host}, Path: ${result?.path}")
+    }
 }
 ```
 
+### 🔐 Secure Short Link
 
-### ✅ Final Checklist
+If you want to encrypt the original URL before shortening it. For privacy or security reasons — the SDK provides a utility function called createSecure. This function encrypts the original URL using AES-GCM and returns a secured URL with a separate decryption key.
+
+```kotlin
+val originalURL = "your_original_URL"
+val result = ShortioSdk.createSecure(originalURL)
+Log.d("SecureURL", "RESULT: ${result}")
+Log.d("securedOriginalURL", "URL: ${result.securedOriginalURL}")
+Log.d("securedShortUrl", "URL: ${result.securedShortUrl}")
+```
+
+### ✅ Final Checklist for Deep Linking
 
 * App is signed with the correct keystore.
 

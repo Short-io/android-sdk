@@ -9,3 +9,8 @@ sealed class StringOrInt {
     data class Str(val value: String) : StringOrInt()
     data class IntVal(val value: Int) : StringOrInt()
 }
+
+data class SecureResult(
+    val securedOriginalURL: String,
+    val securedShortUrl: String
+)

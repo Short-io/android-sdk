@@ -8,6 +8,14 @@ import android.content.Intent
 import android.util.Log
 import com.github.shortiosdk.Helpers.StringOrIntSerializer
 import com.github.shortiosdk.Helpers.HandleClick
+import android.util.Base64
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.nio.charset.StandardCharsets
+import java.security.SecureRandom
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.spec.GCMParameterSpec
 
 
 object ShortioSdk {
@@ -69,20 +77,16 @@ object ShortioSdk {
         }
     }
     
-    fun handleIntent(intent: Intent): UrlComponents? {
+    suspend fun handleIntent(intent: Intent): UrlComponents? {
         val uri = intent.data ?: return null
         val scheme = uri.scheme?.lowercase()
         if (scheme != "http" && scheme != "https") return null
 
         val host = uri.host ?: return null
 
-        var response: String? = null
-        val thread = Thread {
-            response = HandleClick(uri.toString())
-            Log.d("HandleClickResponse", "Response: $response")
+        val response = withContext(Dispatchers.IO) {
+            HandleClick(uri.toString())
         }
-        thread.start()
-        thread.join()
 
         if (response == "200") {
             Log.d("HandleClickResponse","Short SDK click call completed successfully.")
@@ -97,5 +101,36 @@ object ShortioSdk {
             fragment = uri.fragment,
             fullUrl = uri.toString()
         )
+    }
+
+    fun createSecure(originalURL: String): SecureResult {
+        return try {
+
+            val keyGenerator = KeyGenerator.getInstance("AES")
+            keyGenerator.init(128)
+            val secretKey = keyGenerator.generateKey()
+
+            val iv = ByteArray(12)
+            SecureRandom().nextBytes(iv)
+
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            val spec = GCMParameterSpec(128, iv)
+            cipher.init(Cipher.ENCRYPT_MODE, secretKey, spec)
+            val urlBytes = originalURL.toByteArray(StandardCharsets.UTF_8)
+            val encryptedBytes = cipher.doFinal(urlBytes)
+
+            val encryptedUrlBase64 = Base64.encodeToString(encryptedBytes, Base64.NO_WRAP)
+            val encryptedIvBase64 = Base64.encodeToString(iv, Base64.NO_WRAP)
+            val securedOriginalURL = "shortsecure://$encryptedUrlBase64?$encryptedIvBase64"
+
+            val rawKey = secretKey.encoded
+            val keyBase64 = Base64.encodeToString(rawKey, Base64.NO_WRAP)
+            val securedShortUrl = "#$keyBase64"
+
+            SecureResult(securedOriginalURL, securedShortUrl)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            throw e
+        }
     }
 }
