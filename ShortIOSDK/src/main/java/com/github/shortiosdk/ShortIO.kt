@@ -9,6 +9,9 @@ import android.util.Log
 import com.github.shortiosdk.Helpers.StringOrIntSerializer
 import com.github.shortiosdk.Helpers.HandleClick
 import android.util.Base64
+import com.github.shortiosdk.Helpers.extractClidFromUrl
+import com.github.shortiosdk.Helpers.fetchHeadersValue
+import com.github.shortiosdk.Helpers.trackConversion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.nio.charset.StandardCharsets
@@ -84,6 +87,15 @@ object ShortioSdk {
 
         val host = uri.host ?: return null
 
+        val shortioClidUrl = withContext(Dispatchers.IO) {
+            fetchHeadersValue(uri.toString())
+        }
+
+        val clid = shortioClidUrl?.let { extractClidFromUrl(it) }
+
+        val trackingSuccess = trackConversion("https://$host", clid = clid)
+        println("Conversion success: $trackingSuccess")
+
         val response = withContext(Dispatchers.IO) {
             HandleClick(uri.toString())
         }
@@ -99,7 +111,8 @@ object ShortioSdk {
             path = uri.path?.removePrefix("/"),
             query = uri.encodedQuery,
             fragment = uri.fragment,
-            fullUrl = uri.toString()
+            fullUrl = uri.toString(),
+            destinationUrl = shortioClidUrl
         )
     }
 
