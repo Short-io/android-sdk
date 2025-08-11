@@ -52,7 +52,7 @@ It will be:
 ```kotlin
 dependencies {
 	implementation("com.github.User:Repo:Tag") // Example
-	implementation("com.github.Short-io:android-sdk:v1.0.6") // Use this
+	implementation("com.github.Short-io:android-sdk:v1.0.7") // Use this
 }
 ```
 ### 3. Sync the Project
@@ -262,7 +262,7 @@ override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
     lifecycleScope.launch {
         val result = ShortioSdk.handleIntent(intent)
-        Log.d("New Intent", "Host: ${result?.host}, Path: ${result?.path}")
+        Log.d("New Intent", "Host: ${result?.host}, Path: ${result?.path}, DestinationURL: ${result?.destinationUrl}")
     }
 }
 ```
@@ -274,7 +274,7 @@ override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     lifecycleScope.launch {
         val result = ShortioSdk.handleIntent(intent)
-        Log.d("New Intent", "Host: ${result?.host}, Path: ${result?.path}")
+        Log.d("New Intent", "Host: ${result?.host}, Path: ${result?.path}, DestinationURL: ${result?.destinationUrl}")
     }
 }
 ```
@@ -289,6 +289,25 @@ val result = ShortioSdk.createSecure(originalURL)
 Log.d("SecureURL", "RESULT: ${result}")
 Log.d("securedOriginalURL", "URL: ${result.securedOriginalURL}")
 Log.d("securedShortUrl", "URL: ${result.securedShortUrl}")
+```
+
+### 🔄 Conversion Tracking
+
+Conversion tracking is automated in the SDK — no manual setup or method calls are required.
+When your app is opened via a deep link, the SDK automatically records the conversion in the background through the `handleIntent` intent-handling method. Conversion tracking will only be triggered once `handleIntent` is called, so until that happens, no conversion will be recorded.
+
+This means:
+- No need to call trackConversion manually.
+- Conversions are automatically sent whenever the app is launched from a deep link.
+- Conversion tracking without additional code.
+
+Example:
+Simply handle incoming deep links with the SDK’s handleOpen method — conversion tracking happens automatically:
+```kotlin
+    lifecycleScope.launch {
+        val result = ShortioSdk.handleIntent(intent)
+        Log.d("New Intent", "Host: ${result?.host}, Path: ${result?.path}, DestinationURL: ${result?.destinationUrl}")
+    }
 ```
 
 ### ✅ Final Checklist for Deep Linking
