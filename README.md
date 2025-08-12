@@ -52,7 +52,7 @@ It will be:
 ```kotlin
 dependencies {
 	implementation("com.github.User:Repo:Tag") // Example
-	implementation("com.github.Short-io:android-sdk:v1.0.7") // Use this
+	implementation("com.github.Short-io:android-sdk:v1.0.8") // Use this
 }
 ```
 ### 3. Sync the Project
@@ -80,6 +80,23 @@ import com.github.shortiosdk.ShortioSdk
 
 ### 🔗 SDK Usage
 
+#### Initialization
+
+To start using ShortioSdk, you need to initialize it early in your app lifecycle, preferably in your Activity's onCreate() method or in your custom Application class.
+
+Example: Initialize in Activity
+
+```kotlin
+    override fun onCreate() {
+        super.onCreate()
+        ShortioSdk.initialize(apiKey, domain)
+    }
+```
+* apiKey: Your API key string for authenticating requests.
+* domain: The default domain to use for URL shortening.
+
+##### Create Short URL
+
 ```kotlin
 import com.github.shortiosdk.ShortioSdk
 import com.github.shortiosdk.ShortIOParameters
@@ -87,7 +104,6 @@ import com.github.shortiosdk.ShortIOResult
 
 try {
     val params = ShortIOParameters(
-      domain = "your_domain", // Replace with your Short.io domain
       originalURL = "your_originalURL" // Replace with your Short.io domain
     )
 } catch (e: Exception) {
@@ -98,11 +114,10 @@ try {
 **Note**: Both `domain` and `originalURL` are the required parameters. You can also pass optional parameters such as `path`, `title`, `utmParameters`, etc.
 
 ```kotlin
-val apiKey = "your_public_apiKey" // Replace with your Short.io Public API Key
 
 thread {
     try {
-        when (val result = ShortioSdk.shortenUrl(apiKey, params)) {
+        when (val result = ShortioSdk.shortenUrl(params)) {
             is ShortIOResult.Success -> {
                 Log.d("ShortIOResult","Shortened URL: ${result.data.shortURL}")
             }
@@ -123,7 +138,7 @@ The `ShortIOParameters` struct is used to define the details of the short link y
 
 | Parameter           | Type        | Required  | Description                                                  |
 | ------------------- | ----------- | --------  | ------------------------------------------------------------ |
-| `domain`            | `String`    | ✅        | Your Short.io domain (e.g., `example.short.gy`)              |
+| `domain`            | `String`    | ❌        | Your Short.io domain (e.g., `example.short.gy`)              |
 | `originalURL`       | `String`    | ✅        | The original URL to be shortened                             |
 | `cloaking`          | `Boolean`   | ❌        | If `true`, hides the destination URL from the user           |
 | `password`          | `String`    | ❌        | Password to protect the short link                           |
@@ -293,22 +308,22 @@ Log.d("securedShortUrl", "URL: ${result.securedShortUrl}")
 
 ### 🔄 Conversion Tracking
 
-Conversion tracking is automated in the SDK — no manual setup or method calls are required.
-When your app is opened via a deep link, the SDK automatically records the conversion in the background through the `handleIntent` intent-handling method. Conversion tracking will only be triggered once `handleIntent` is called, so until that happens, no conversion will be recorded.
+Track conversions for your short links to measure campaign effectiveness. The SDK provides a simple method to record conversions.
 
-This means:
-- No need to call trackConversion manually.
-- Conversions are automatically sent whenever the app is launched from a deep link.
-- Conversion tracking without additional code.
-
-Example:
-Simply handle incoming deep links with the SDK’s handleOpen method — conversion tracking happens automatically:
 ```kotlin
-    lifecycleScope.launch {
-        val result = ShortioSdk.handleIntent(intent)
-        Log.d("New Intent", "Host: ${result?.host}, Path: ${result?.path}, DestinationURL: ${result?.destinationUrl}")
+    CoroutineScope(Dispatchers.IO).launch {
+        try {
+            val res = ShortioSdk.trackConversion(
+                "https://{your_domain}/",
+                        conversionId = null
+            )
+            // conversionId can be 'signup', 'purchase', 'download', etc.
+            Log.d("Handle Conversion Tracking", "Handle Conversion Tracking: $res")
+        } catch (e: Exception) {
+            Log.e("Handle Conversion Tracking", "Error calling trackConversion", e)
+        }
     }
-```
+
 
 ### ✅ Final Checklist for Deep Linking
 
