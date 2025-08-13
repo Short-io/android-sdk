@@ -87,15 +87,15 @@ To start using ShortioSdk, you need to initialize it early in your app lifecycle
 Example: Initialize in Activity
 
 ```kotlin
-    override fun onCreate() {
-        super.onCreate()
-        ShortioSdk.initialize(apiKey, domain)
-    }
+override fun onCreate() {
+    super.onCreate()
+    ShortioSdk.initialize(apiKey, domain)
+}
 ```
-* apiKey: Your API key string for authenticating requests.
+* apiKey: Your API key string for SDK initialization.
 * domain: The default domain to use for URL shortening.
 
-##### Create Short URL
+#### Create Short URL
 
 ```kotlin
 import com.github.shortiosdk.ShortioSdk
@@ -111,7 +111,7 @@ try {
 }
 ```
 
-**Note**: Both `domain` and `originalURL` are the required parameters. You can also pass optional parameters such as `path`, `title`, `utmParameters`, etc.
+**Note**: Only the `originalURL` is the required parameter as `domain` is passed in the initialize method of SDK. You can also pass optional parameters such as `path`, `title`, `utmParameters`, etc.
 
 ```kotlin
 
@@ -311,19 +311,19 @@ Log.d("securedShortUrl", "URL: ${result.securedShortUrl}")
 Track conversions for your short links to measure campaign effectiveness. The SDK provides a simple method to record conversions.
 
 ```kotlin
-    CoroutineScope(Dispatchers.IO).launch {
-        try {
-            val res = ShortioSdk.trackConversion(
-                "https://{your_domain}/",
-                        conversionId = null
-            )
-            // conversionId can be 'signup', 'purchase', 'download', etc.
-            Log.d("Handle Conversion Tracking", "Handle Conversion Tracking: $res")
-        } catch (e: Exception) {
-            Log.e("Handle Conversion Tracking", "Error calling trackConversion", e)
-        }
+CoroutineScope(Dispatchers.IO).launch {
+    try {
+        val res = ShortioSdk.trackConversion(
+            "https://{your_domain}/",
+                    conversionId = null
+        )
+        // conversionId can be 'signup', 'purchase', 'download', etc.
+        Log.d("Handle Conversion Tracking", "Handle Conversion Tracking: $res")
+    } catch (e: Exception) {
+        Log.e("Handle Conversion Tracking", "Error calling trackConversion", e)
     }
-
+}
+```
 
 ### ✅ Final Checklist for Deep Linking
 

@@ -6,13 +6,13 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import com.google.gson.GsonBuilder
 import android.content.Intent
 import com.github.shortiosdk.Helpers.StringOrIntSerializer
-import com.github.shortiosdk.Helpers.HandleClick
 import android.util.Base64
 import android.util.Log
 import com.github.shortiosdk.Helpers.extractClidFromUrl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.URI
+import java.net.URL
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.security.SecureRandom
@@ -22,12 +22,18 @@ import javax.crypto.spec.GCMParameterSpec
 
 
 object ShortioSdk {
+    var apiKey: String = ""
+    var savedDestinationUrl: String = ""
     var savedDomain: String? = null
     var storedClid: String = ""
-
-    var apiKey: String = ""
     var isInitialized: Boolean = false
 
+    /**
+     * Initialize the SDK through this method to use it.
+     * Parameters required:
+     * apiKey of type String
+     * domain of type String
+     */
     fun initialize( apiKey: String, domain: String) {
         if (!isInitialized){
             this.apiKey = apiKey
@@ -39,9 +45,24 @@ object ShortioSdk {
         }
     }
 
+    /**
+     * Use this method to check the SDK is already initialized
+     */
+    fun isSdkInitialized(): Boolean {
+        if (!isInitialized) {
+            throw IllegalStateException("SDK is not initialized. Please call initialize before using the SDK.")
+        }
+        return true
+    }
+
+    /**
+     * Create ShortUrl by using shortenUrl Method
+     * Parameters:- It takes ShortIOParameters as parameter which includes originalUrl, domain, clocking, password, title etc.
+     */
     fun shortenUrl(
         parameters: ShortIOParameters
     ): ShortIOResult {
+        isSdkInitialized()
         val gson = GsonBuilder()
             .registerTypeAdapter(StringOrInt::class.java, StringOrIntSerializer())
             .create()
@@ -98,7 +119,12 @@ object ShortioSdk {
             return ShortIOResult.Error(errorModel)
         }
     }
-    
+
+    /**
+     * handleIntent() method is used handle the intent and it returns UrlComponents
+     * Parameters: intent of type Intent
+     * Returns: UrlComponents which includes scheme, host, path, destibnationUrl, etc.
+     */
     suspend fun handleIntent(intent: Intent): UrlComponents? {
         val uri = intent.data ?: return null
         val scheme = uri.scheme?.lowercase()
@@ -109,7 +135,9 @@ object ShortioSdk {
         val shortioClidUrl = withContext(Dispatchers.IO) {
             HandleClick(uri.toString())
         }
-
+        if (shortioClidUrl != null) {
+            savedDestinationUrl =  shortioClidUrl
+        }
         storedClid = shortioClidUrl.let { it?.let { urlString -> extractClidFromUrl(urlString) } ?: "" }
 
         return UrlComponents(
@@ -124,11 +152,45 @@ object ShortioSdk {
     }
 
     /**
+     * HandleClick() is used to track the click
+     * Parameters: It takes uriString of type String as parameter.
+     * Returns String
+     */
+    suspend private fun HandleClick(uriString: String): String? = withContext(Dispatchers.IO) {
+        isSdkInitialized()
+        try {
+            val urlString = when {
+                uriString.contains("utm_medium=android", ignoreCase = true) -> uriString
+                uriString.contains("?") -> "$uriString&utm_medium=android"
+                else -> "$uriString?utm_medium=android"
+            }
+
+            val client = OkHttpClient.Builder()
+                .followRedirects(false)
+                .build()
+
+            val request = Request.Builder()
+                .url(URL(urlString))
+                .head()
+                .build()
+
+            client.newCall(request).execute().use { response ->
+
+                response.header("Location")
+            }
+        } catch (e: Exception) {
+            println("Network error: ${e.localizedMessage}")
+            null
+        }
+    }
+
+    /**
      * It creates a Secure URL
-    - parameters: originalURL: String
-    - Returns: SecureResult
+     * parameters: originalURL: String
+     * Returns: SecureResult which includes securedOriginalURL and securedShortUrl
      */
     fun createSecure(originalURL: String): SecureResult {
+        isSdkInitialized()
         return try {
 
             val keyGenerator = KeyGenerator.getInstance("AES")
@@ -160,17 +222,24 @@ object ShortioSdk {
     }
 
     /**
-    - parameters: originalURL: String, clid: String, conversionId: String? = nil
-    - conversionId can be 'signup', 'purchase', 'download', etc.
-    - Returns: Result Boolean based on status code
+     * trackConversion() method is used to track the conversion.
+     * parameters: originalURL: String, clid: String, conversionId: String? = nil
+     * conversionId can be 'signup', 'purchase', 'download', etc.
+     * Returns: Result Boolean based on status code
      */
     suspend fun trackConversion(
-        originalURL: String,
+        originalURL: String? = null,
         clid: String? = null,
         conversionId: String? = null
     ): Boolean = withContext(Dispatchers.IO) {
+        isSdkInitialized()
         try {
-            val originalUri = URI(originalURL)
+            val originalURLString = if (originalURL.isNullOrEmpty()){
+                savedDestinationUrl
+            } else {
+                originalURL
+            }
+            val originalUri = URI(originalURLString)
             val scheme = originalUri.scheme ?: return@withContext false
             val host = originalUri.host ?: return@withContext false
 
