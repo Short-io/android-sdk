@@ -9,8 +9,10 @@ import com.github.shortiosdk.Helpers.StringOrIntSerializer
 import android.util.Base64
 import android.util.Log
 import com.github.shortiosdk.Helpers.extractClidFromUrl
+import com.github.shortiosdk.Helpers.removeUtmParams
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
 import java.net.URLEncoder
@@ -19,10 +21,14 @@ import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.spec.GCMParameterSpec
+import kotlin.collections.component1
+import kotlin.collections.component2
+import kotlin.collections.iterator
+import kotlin.collections.joinToString
 
 
 object ShortioSdk {
-    var apiKey: String = ""
+    var storedApiKey: String = ""
     var savedDestinationUrl: String = ""
     var savedDomain: String? = null
     var storedClid: String = ""
@@ -36,7 +42,7 @@ object ShortioSdk {
      */
     fun initialize( apiKey: String, domain: String) {
         if (!isInitialized){
-            this.apiKey = apiKey
+            this.storedApiKey = apiKey
             this.savedDomain = domain
             println("SDK initialized with API key: $apiKey")
             isInitialized = true
@@ -50,24 +56,41 @@ object ShortioSdk {
      */
     fun isSdkInitialized(): Boolean {
         if (!isInitialized) {
-            throw IllegalStateException("SDK is not initialized. Please call initialize before using the SDK.")
+            throw IllegalStateException("SDK is not initialized. Please initialize the SDk before using it.")
         }
         return true
     }
 
     /**
-     * Create ShortUrl by using shortenUrl Method
-     * Parameters:- It takes ShortIOParameters as parameter which includes originalUrl, domain, clocking, password, title etc.
+     * This function will deprecates soon. "Use shortenUrl(parameters) instead"
+     * Create ShortUrl by using shortenUrl Method.
+     * Parameters:- It takes ShortIOParameters as parameter which includes originalUrl, domain, clocking, password, title etc. It also apiKey.
      */
+    @Deprecated(
+        message = "Use shortenUrl(parameters) instead",
+        replaceWith = ReplaceWith("shortenUrl(parameters)"),
+        level = DeprecationLevel.WARNING
+    )
     fun shortenUrl(
+        deprecatedApiKey: String? = null,
         parameters: ShortIOParameters
     ): ShortIOResult {
-        isSdkInitialized()
         val gson = GsonBuilder()
             .registerTypeAdapter(StringOrInt::class.java, StringOrIntSerializer())
             .create()
-        if (parameters.domain.isNullOrBlank()) {
-            parameters.domain = savedDomain!!
+        if (parameters.domain.isNullOrBlank()){
+            val errorModel = ShortIOErrorModel(
+                message = "Domain Not Provided",
+                statusCode = 400,
+                code = "MALFORMED_SUCCESS",
+                success = false
+            )
+            return ShortIOResult.Error(errorModel)
+        }
+        var apiKey = if (!deprecatedApiKey.isNullOrBlank()){
+            deprecatedApiKey
+        } else{
+            storedApiKey
         }
         val client = OkHttpClient()
         val mediaType = "application/json".toMediaType()
@@ -121,6 +144,73 @@ object ShortioSdk {
     }
 
     /**
+     * This is new method of creating short URL.
+     * Create ShortUrl by using shortenUrl(parameters: ShortIOParameters) Method
+     * Parameters:- It takes ShortIOParameters as parameter which includes originalUrl, domain, clocking, password, title etc.
+     */
+    fun shortenUrl(
+        parameters: ShortIOParameters
+    ): ShortIOResult {
+        isSdkInitialized()
+        val gson = GsonBuilder()
+            .registerTypeAdapter(StringOrInt::class.java, StringOrIntSerializer())
+            .create()
+        if (parameters.domain.isNullOrBlank()) {
+            parameters.domain = savedDomain!!
+        }
+
+        val client = OkHttpClient()
+        val mediaType = "application/json".toMediaType()
+        val jsonBody = gson.toJson(parameters)
+        val body = jsonBody.toRequestBody(mediaType)
+
+        val request = Request.Builder()
+            .url(baseURL)
+            .post(body)
+            .addHeader("accept", "application/json")
+            .addHeader("content-type", "application/json")
+            .addHeader("authorization", storedApiKey)
+            .build()
+
+        val response = client.newCall(request).execute()
+        val responseBody = response.body?.string()
+
+        return if (response.isSuccessful) {
+            val model = responseBody?.let { gson.fromJson(it, ShortIOResponseModel::class.java) }
+            if (model != null) {
+                ShortIOResult.Success(model)
+            } else {
+                val errorModel = ShortIOErrorModel(
+                    message = "Empty or malformed success response",
+                    statusCode = response.code,
+                    code = "MALFORMED_SUCCESS",
+                    success = false
+                )
+                ShortIOResult.Error(errorModel)
+            }
+        } else {
+            val errorModel = try {
+                responseBody?.let {
+                    gson.fromJson(it, ShortIOErrorModel::class.java)?.copy(statusCode = response.code)
+                } ?: ShortIOErrorModel(
+                    message = "Unknown error",
+                    statusCode = response.code,
+                    code = "UNKNOWN",
+                    success = false
+                )
+            } catch (e: Exception) {
+                ShortIOErrorModel(
+                    message = "Malformed error response: ${e.localizedMessage}",
+                    statusCode = response.code,
+                    code = "INVALID_JSON",
+                    success = false
+                )
+            }
+            return ShortIOResult.Error(errorModel)
+        }
+    }
+
+    /**
      * handleIntent() method is used handle the intent and it returns UrlComponents
      * Parameters: intent of type Intent
      * Returns: UrlComponents which includes scheme, host, path, destibnationUrl, etc.
@@ -133,12 +223,14 @@ object ShortioSdk {
         val host = uri.host ?: return null
 
         val shortioClidUrl = withContext(Dispatchers.IO) {
-            HandleClick(uri.toString())
-        }
-        if (shortioClidUrl != null) {
-            savedDestinationUrl =  shortioClidUrl
+            handleClick(uri.toString())
         }
         storedClid = shortioClidUrl.let { it?.let { urlString -> extractClidFromUrl(urlString) } ?: "" }
+
+        val destinationUrl = shortioClidUrl?.let { removeUtmParams(it) }
+        if (destinationUrl != null) {
+            savedDestinationUrl = destinationUrl
+        }
 
         return UrlComponents(
             scheme = scheme,
@@ -147,37 +239,46 @@ object ShortioSdk {
             query = uri.encodedQuery,
             fragment = uri.fragment,
             fullUrl = uri.toString(),
-            destinationUrl = shortioClidUrl
+            destinationUrl = destinationUrl
         )
     }
 
     /**
-     * HandleClick() is used to track the click
+     * handleClick() is used to track the click
      * Parameters: It takes uriString of type String as parameter.
      * Returns String
      */
-    suspend private fun HandleClick(uriString: String): String? = withContext(Dispatchers.IO) {
-        isSdkInitialized()
-        try {
+    suspend fun handleClick(uriString: String): String? {
+        return try {
             val urlString = when {
                 uriString.contains("utm_medium=android", ignoreCase = true) -> uriString
                 uriString.contains("?") -> "$uriString&utm_medium=android"
                 else -> "$uriString?utm_medium=android"
             }
 
-            val client = OkHttpClient.Builder()
-                .followRedirects(false)
-                .build()
-
-            val request = Request.Builder()
-                .url(URL(urlString))
-                .head()
-                .build()
-
-            client.newCall(request).execute().use { response ->
-
-                response.header("Location")
+            val url = URL(urlString)
+            val connection = withContext(Dispatchers.IO) {
+                url.openConnection() as HttpURLConnection
             }
+
+            connection.requestMethod = "HEAD"
+            connection.instanceFollowRedirects = false
+
+            connection.connect()
+
+            println("Response Headers:")
+            for ((key, value) in connection.headerFields) {
+                if (key != null && value != null) {
+                    println("  $key: ${value.joinToString()}")
+                }
+            }
+
+            val redirectedUrl = connection.getHeaderField("Location")
+
+            connection.disconnect()
+
+            redirectedUrl ?: "Not Found"
+
         } catch (e: Exception) {
             println("Network error: ${e.localizedMessage}")
             null
@@ -190,7 +291,6 @@ object ShortioSdk {
      * Returns: SecureResult which includes securedOriginalURL and securedShortUrl
      */
     fun createSecure(originalURL: String): SecureResult {
-        isSdkInitialized()
         return try {
 
             val keyGenerator = KeyGenerator.getInstance("AES")
@@ -232,7 +332,6 @@ object ShortioSdk {
         clid: String? = null,
         conversionId: String? = null
     ): Boolean = withContext(Dispatchers.IO) {
-        isSdkInitialized()
         try {
             val originalURLString = if (originalURL.isNullOrEmpty()){
                 savedDestinationUrl

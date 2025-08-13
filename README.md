@@ -95,7 +95,11 @@ override fun onCreate() {
 * apiKey: Your API key string for SDK initialization.
 * domain: The default domain to use for URL shortening.
 
-#### Create Short URL
+### 💡 How It Works
+
+The app demonstrates:
+
+#### ✅ Generating Short Links
 
 ```kotlin
 import com.github.shortiosdk.ShortioSdk
@@ -131,6 +135,8 @@ thread {
     }
 }       
 ```
+**Note**: Deprecated: `shortenUrl`(apiKey, params) is still supported for backward compatibility but is no longer recommended for use. Use shortenUrl(params) instead.
+
 ## 📄 API Parameters
 
 The `ShortIOParameters` struct is used to define the details of the short link you want to create. Below are the available parameters:
@@ -138,7 +144,7 @@ The `ShortIOParameters` struct is used to define the details of the short link y
 
 | Parameter           | Type        | Required  | Description                                                  |
 | ------------------- | ----------- | --------  | ------------------------------------------------------------ |
-| `domain`            | `String`    | ❌        | Your Short.io domain (e.g., `example.short.gy`)              |
+| `domain`            | `String`    | ✅        | Your Short.io domain (e.g., `example.short.gy`)              |
 | `originalURL`       | `String`    | ✅        | The original URL to be shortened                             |
 | `cloaking`          | `Boolean`   | ❌        | If `true`, hides the destination URL from the user           |
 | `password`          | `String`    | ❌        | Password to protect the short link                           |
@@ -315,8 +321,10 @@ CoroutineScope(Dispatchers.IO).launch {
     try {
         val res = ShortioSdk.trackConversion(
             "https://{your_domain}/",
-                    conversionId = null
+            "your_clid"
+            conversionId = null
         )
+        /// all parameters are optional
         // conversionId can be 'signup', 'purchase', 'download', etc.
         Log.d("Handle Conversion Tracking", "Handle Conversion Tracking: $res")
     } catch (e: Exception) {
