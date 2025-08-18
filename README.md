@@ -52,7 +52,7 @@ It will be:
 ```kotlin
 dependencies {
 	implementation("com.github.User:Repo:Tag") // Example
-	implementation("com.github.Short-io:android-sdk:v1.0.8") // Use this
+	implementation("com.github.Short-io:android-sdk:v1.0.9") // Use this
 }
 ```
 ### 3. Sync the Project
@@ -80,7 +80,7 @@ import com.github.shortiosdk.ShortioSdk
 
 ### 🔗 SDK Usage
 
-#### Initialization
+#### Initialize the SDK
 
 To start using ShortioSdk, you need to initialize it early in your app lifecycle, preferably in your Activity's onCreate() method or in your custom Application class.
 
@@ -121,7 +121,7 @@ try {
 
 thread {
     try {
-        when (val result = ShortioSdk.shortenUrl(params)) {
+        when (val result = ShortioSdk.createShortLink(params)) {
             is ShortIOResult.Success -> {
                 Log.d("ShortIOResult","Shortened URL: ${result.data.shortURL}")
             }
@@ -135,7 +135,7 @@ thread {
     }
 }       
 ```
-**Note**: Deprecated: `shortenUrl`(apiKey, params) is still supported for backward compatibility but is no longer recommended for use. Use shortenUrl(params) instead.
+**Note**: Deprecated: `createShortLink`(apiKey, params) is still supported for backward compatibility but is no longer recommended for use. Use `createShortLink(params)` instead.
 
 ## 📄 API Parameters
 
@@ -144,8 +144,8 @@ The `ShortIOParameters` struct is used to define the details of the short link y
 
 | Parameter           | Type        | Required  | Description                                                  |
 | ------------------- | ----------- | --------  | ------------------------------------------------------------ |
-| `domain`            | `String`    | ✅        | Your Short.io domain (e.g., `example.short.gy`)              |
-| `originalURL`       | `String`    | ✅        | The original URL to be shortened                             |
+| `domain`            | `String`    | ✅ (Deprecated)        | Your Short.io domain (e.g., `example.short.gy`). ⚠️ Deprecated. No longer required — inferred from API key. May be removed in future versions.              |
+| `originalURL`       | `String`    | ✅       | The original URL to be shortened                             |
 | `cloaking`          | `Boolean`   | ❌        | If `true`, hides the destination URL from the user           |
 | `password`          | `String`    | ❌        | Password to protect the short link                           |
 | `redirectType`      | `Int`       | ❌        | Type of redirect (e.g., 301, 302)                            |
@@ -320,11 +320,10 @@ Track conversions for your short links to measure campaign effectiveness. The SD
 CoroutineScope(Dispatchers.IO).launch {
     try {
         val res = ShortioSdk.trackConversion(
-            "https://{your_domain}/",
-            "your_clid"
-            conversionId = null
+            domain: "https://{your_domain}", // ⚠️ Deprecated (optional):
+            clid: "your_clid", // ⚠️ Deprecated (optional):
+            conversionId: "your_conversionID" (optional)
         )
-        /// all parameters are optional
         // conversionId can be 'signup', 'purchase', 'download', etc.
         Log.d("Handle Conversion Tracking", "Handle Conversion Tracking: $res")
     } catch (e: Exception) {

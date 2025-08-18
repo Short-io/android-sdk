@@ -13,7 +13,6 @@ import com.github.shortiosdk.Helpers.removeUtmParams
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
-import java.net.URI
 import java.net.URL
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -28,10 +27,9 @@ import kotlin.collections.joinToString
 
 
 object ShortioSdk {
-    var storedApiKey: String = ""
-    var savedDestinationUrl: String = ""
-    var savedDomain: String? = null
-    var storedClid: String = ""
+    var apiKey: String = ""
+    var domain: String = ""
+    var clid: String = ""
     var isInitialized: Boolean = false
 
     /**
@@ -42,8 +40,8 @@ object ShortioSdk {
      */
     fun initialize( apiKey: String, domain: String) {
         if (!isInitialized){
-            this.storedApiKey = apiKey
-            this.savedDomain = domain
+            this.apiKey = apiKey
+            this.domain = domain
             println("SDK initialized with API key: $apiKey")
             isInitialized = true
         } else{
@@ -67,31 +65,42 @@ object ShortioSdk {
      * Parameters:- It takes ShortIOParameters as parameter which includes originalUrl, domain, clocking, password, title etc. It also apiKey.
      */
     @Deprecated(
-        message = "Use shortenUrl(parameters) instead",
-        replaceWith = ReplaceWith("shortenUrl(parameters)"),
+        message = "Use createShortLink(parameters) instead",
+        replaceWith = ReplaceWith("createShortLink(parameters)"),
         level = DeprecationLevel.WARNING
     )
-    fun shortenUrl(
-        deprecatedApiKey: String? = null,
+    fun createShortLink(
+        parameters: ShortIOParameters,
+        apiKey: String? = null
+    ): ShortIOResult {
+        return  performCreateShortLink(
+            parameters = parameters,
+            apiKey = apiKey.toString()
+        )
+    }
+
+    /**
+     * This is new method of creating short URL.
+     * Create ShortUrl by using shortenUrl(parameters: ShortIOParameters) Method
+     * Parameters:- It takes ShortIOParameters as parameter which includes originalUrl, domain, clocking, password, title etc.
+     */
+    fun createShortLink(
         parameters: ShortIOParameters
     ): ShortIOResult {
+        return  performCreateShortLink(
+            parameters = parameters,
+            apiKey = ShortioSdk.apiKey
+        )
+    }
+
+    private fun performCreateShortLink(parameters: ShortIOParameters, apiKey: String): ShortIOResult {
         val gson = GsonBuilder()
             .registerTypeAdapter(StringOrInt::class.java, StringOrIntSerializer())
             .create()
-        if (parameters.domain.isNullOrBlank()){
-            val errorModel = ShortIOErrorModel(
-                message = "Domain Not Provided",
-                statusCode = 400,
-                code = "MALFORMED_SUCCESS",
-                success = false
-            )
-            return ShortIOResult.Error(errorModel)
+        if (parameters.domain.isNullOrBlank()) {
+            parameters.domain = domain
         }
-        var apiKey = if (!deprecatedApiKey.isNullOrBlank()){
-            deprecatedApiKey
-        } else{
-            storedApiKey
-        }
+
         val client = OkHttpClient()
         val mediaType = "application/json".toMediaType()
         val jsonBody = gson.toJson(parameters)
@@ -103,73 +112,6 @@ object ShortioSdk {
             .addHeader("accept", "application/json")
             .addHeader("content-type", "application/json")
             .addHeader("authorization", apiKey)
-            .build()
-
-        val response = client.newCall(request).execute()
-        val responseBody = response.body?.string()
-
-        return if (response.isSuccessful) {
-            val model = responseBody?.let { gson.fromJson(it, ShortIOResponseModel::class.java) }
-            if (model != null) {
-                ShortIOResult.Success(model)
-            } else {
-                val errorModel = ShortIOErrorModel(
-                    message = "Empty or malformed success response",
-                    statusCode = response.code,
-                    code = "MALFORMED_SUCCESS",
-                    success = false
-                )
-                ShortIOResult.Error(errorModel)
-            }
-        } else {
-            val errorModel = try {
-                responseBody?.let {
-                    gson.fromJson(it, ShortIOErrorModel::class.java)?.copy(statusCode = response.code)
-                } ?: ShortIOErrorModel(
-                    message = "Unknown error",
-                    statusCode = response.code,
-                    code = "UNKNOWN",
-                    success = false
-                )
-            } catch (e: Exception) {
-                ShortIOErrorModel(
-                    message = "Malformed error response: ${e.localizedMessage}",
-                    statusCode = response.code,
-                    code = "INVALID_JSON",
-                    success = false
-                )
-            }
-            return ShortIOResult.Error(errorModel)
-        }
-    }
-
-    /**
-     * This is new method of creating short URL.
-     * Create ShortUrl by using shortenUrl(parameters: ShortIOParameters) Method
-     * Parameters:- It takes ShortIOParameters as parameter which includes originalUrl, domain, clocking, password, title etc.
-     */
-    fun shortenUrl(
-        parameters: ShortIOParameters
-    ): ShortIOResult {
-        isSdkInitialized()
-        val gson = GsonBuilder()
-            .registerTypeAdapter(StringOrInt::class.java, StringOrIntSerializer())
-            .create()
-        if (parameters.domain.isNullOrBlank()) {
-            parameters.domain = savedDomain!!
-        }
-
-        val client = OkHttpClient()
-        val mediaType = "application/json".toMediaType()
-        val jsonBody = gson.toJson(parameters)
-        val body = jsonBody.toRequestBody(mediaType)
-
-        val request = Request.Builder()
-            .url(baseURL)
-            .post(body)
-            .addHeader("accept", "application/json")
-            .addHeader("content-type", "application/json")
-            .addHeader("authorization", storedApiKey)
             .build()
 
         val response = client.newCall(request).execute()
@@ -225,12 +167,9 @@ object ShortioSdk {
         val shortioClidUrl = withContext(Dispatchers.IO) {
             handleClick(uri.toString())
         }
-        storedClid = shortioClidUrl.let { it?.let { urlString -> extractClidFromUrl(urlString) } ?: "" }
+        clid = shortioClidUrl.let { it?.let { urlString -> extractClidFromUrl(urlString) } ?: "" }
 
         val destinationUrl = shortioClidUrl?.let { removeUtmParams(it) }
-        if (destinationUrl != null) {
-            savedDestinationUrl = destinationUrl
-        }
 
         return UrlComponents(
             scheme = scheme,
@@ -328,36 +267,38 @@ object ShortioSdk {
      * Returns: Result Boolean based on status code
      */
     suspend fun trackConversion(
-        originalURL: String? = null,
         clid: String? = null,
+        domain: String? = null,
         conversionId: String? = null
     ): Boolean = withContext(Dispatchers.IO) {
         try {
-            val originalURLString = if (originalURL.isNullOrEmpty()){
-                savedDestinationUrl
-            } else {
-                originalURL
-            }
-            val originalUri = URI(originalURLString)
-            val scheme = originalUri.scheme ?: return@withContext false
-            val host = originalUri.host ?: return@withContext false
 
             // Build query params
             val queryParams = mutableListOf<Pair<String, String>>()
             if (!conversionId.isNullOrEmpty()) {
                 queryParams.add("c" to conversionId)
             }
-            if (!clid.isNullOrEmpty()) {
-                queryParams.add("clid" to clid)
-            } else{
-                queryParams.add("clid" to storedClid)
+            var finalDomain = if (!domain.isNullOrEmpty()) {
+                domain
+            } else {
+                ShortioSdk.domain
+            }
+
+            var finalClid = if (!clid.isNullOrEmpty()) {
+                clid
+            } else {
+                ShortioSdk.clid
+            }
+
+            if (!finalClid.isNullOrEmpty()) {
+                queryParams.add("clid" to finalClid)
             }
 
             val queryString = queryParams.joinToString("&") {
                 "${it.first}=${URLEncoder.encode(it.second, "UTF-8")}"
             }
 
-            val finalUrl = "$scheme://$host/.shortio/conversion?$queryString"
+            val finalUrl = "https://$finalDomain/.shortio/conversion?$queryString"
 
             val client = OkHttpClient()
 
