@@ -274,6 +274,8 @@ keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -sto
 
 ### 🧭 Step 5: Handle Incoming URLs with onNewIntent() Method
 
+To retrieve the original URL from Short.io links in your Android app, you can handle incoming intents in onNewIntent(), which allows your activity to process links that are opened while it is already running.
+
 1. Open your main activity file (e.g., MainActivity.kt).
 
 2. Override the `onNewIntent()` method to receive new intents when the activity is already running:
@@ -283,19 +285,31 @@ override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
     lifecycleScope.launch {
         val result = ShortioSdk.handleIntent(intent)
-        Log.d("New Intent", "Host: ${result?.host}, Path: ${result?.path}, DestinationURL: ${result?.destinationUrl}")
+        // Access the original URL
+        val originalUrl = result?.destinationUrl
+        Log.d("New Intent", 
+            "Host: ${result?.host},
+            Path: ${result?.path},
+            Original URL: $originalUrl"
+        )
     }
 }
 ```
 
-3. In the same activity, also handle the initial intent inside the `onCreate()` method:
+3. In the same activity, To handle the initial intent inside the `onCreate()` method:
 
 ```kotlin
 override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     lifecycleScope.launch {
         val result = ShortioSdk.handleIntent(intent)
-        Log.d("New Intent", "Host: ${result?.host}, Path: ${result?.path}, DestinationURL: ${result?.destinationUrl}")
+        // Access the original URL
+        val originalUrl = result?.destinationUrl
+        Log.d("New Intent", 
+            "Host: ${result?.host},
+            Path: ${result?.path},
+            Original URL: $originalUrl"
+        )
     }
 }
 ```
