@@ -109,6 +109,17 @@ object ShortioSdk {
     }
 
     private fun performCreateShortLink(parameters: ShortIOParameters, apiKey: String): ShortIOResult {
+        if (apiKey.isBlank()) {
+            return ShortIOResult.Error(
+                ShortIOErrorModel(
+                    message = "No API key. Call initialize() or pass one to createShortLink().",
+                    statusCode = null,
+                    code = "NOT_INITIALIZED",
+                    success = false
+                )
+            )
+        }
+
         val gson = GsonBuilder()
             .registerTypeAdapter(StringOrInt::class.java, StringOrIntSerializer())
             .create()

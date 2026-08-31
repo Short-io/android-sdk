@@ -150,6 +150,16 @@ class ShortIOSdkTests {
     }
 
     @Test
+    fun createShortLinkWithoutAnApiKeyFailsWithoutCallingTheApi() {
+        val result = ShortioSdk.createShortLink(ShortIOParameters("https://example.com"))
+
+        assertTrue(result is ShortIOResult.Error)
+        assertEquals("NOT_INITIALIZED", (result as ShortIOResult.Error).data.code)
+        assertEquals(null, result.data.statusCode)
+        assertEquals(0, stub.requests.size)
+    }
+
+    @Test
     fun outOfRangeParametersAreRejectedAtConstruction() {
         assertThrows(IllegalArgumentException::class.java) {
             ShortIOParameters("https://example.com", clicksLimit = 0)
