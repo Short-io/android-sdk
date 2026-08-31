@@ -1,6 +1,7 @@
 package com.github.shortiosdk.Helpers
 
 import android.net.Uri
+import android.util.Log
 
 
 fun extractClidFromUrl(urlString: String): String? {
@@ -8,7 +9,7 @@ fun extractClidFromUrl(urlString: String): String? {
         val uri = Uri.parse(urlString)
         uri.getQueryParameter("clid")
     } catch (e: Exception) {
-        e.printStackTrace()
+        Log.e("ShortioSdk", "could not read clid from $urlString", e)
         null
     }
 }

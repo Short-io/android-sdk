@@ -5,9 +5,11 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import com.google.gson.GsonBuilder
 import android.content.Intent
+import android.net.Uri
 import com.github.shortiosdk.Helpers.StringOrIntSerializer
 import android.util.Base64
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import com.github.shortiosdk.Helpers.extractClidFromUrl
 import com.github.shortiosdk.Helpers.removeUtmParams
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +34,18 @@ object ShortioSdk {
     var clid: String = ""
     var isInitialized: Boolean = false
 
+    @VisibleForTesting
+    internal var httpClient: OkHttpClient = OkHttpClient()
+
+    @VisibleForTesting
+    internal fun resetForTesting(client: OkHttpClient = OkHttpClient()) {
+        apiKey = ""
+        domain = ""
+        clid = ""
+        isInitialized = false
+        httpClient = client
+    }
+
     /**
      * Initialize the SDK through this method to use it.
      * Parameters required:
@@ -42,10 +56,9 @@ object ShortioSdk {
         if (!isInitialized){
             this.apiKey = apiKey
             this.domain = domain
-            println("SDK initialized with API key: $apiKey")
             isInitialized = true
         } else{
-            Log.d("SDK Initialization","SDK is already Initialzed")
+            Log.d("SDK Initialization","SDK is already Initialized")
         }
     }
 
@@ -63,6 +76,7 @@ object ShortioSdk {
      * This function will deprecates soon. "Use shortenUrl(parameters) instead"
      * Create ShortUrl by using shortenUrl Method.
      * Parameters:- It takes ShortIOParameters as parameter which includes originalUrl, domain, clocking, password, title etc. It also apiKey.
+     * Blocks while the request runs. Call it from a background thread.
      */
     @Deprecated(
         message = "Use createShortLink(parameters) instead",
@@ -75,7 +89,7 @@ object ShortioSdk {
     ): ShortIOResult {
         return  performCreateShortLink(
             parameters = parameters,
-            apiKey = apiKey.toString()
+            apiKey = apiKey ?: ShortioSdk.apiKey
         )
     }
 
@@ -83,6 +97,7 @@ object ShortioSdk {
      * This is new method of creating short URL.
      * Create ShortUrl by using shortenUrl(parameters: ShortIOParameters) Method
      * Parameters:- It takes ShortIOParameters as parameter which includes originalUrl, domain, clocking, password, title etc.
+     * Blocks while the request runs. Call it from a background thread.
      */
     fun createShortLink(
         parameters: ShortIOParameters
@@ -101,7 +116,6 @@ object ShortioSdk {
             parameters.domain = domain
         }
 
-        val client = OkHttpClient()
         val mediaType = "application/json".toMediaType()
         val jsonBody = gson.toJson(parameters)
         val body = jsonBody.toRequestBody(mediaType)
@@ -114,7 +128,7 @@ object ShortioSdk {
             .addHeader("authorization", apiKey)
             .build()
 
-        val response = client.newCall(request).execute()
+        val response = httpClient.newCall(request).execute()
         val responseBody = response.body?.string()
 
         return if (response.isSuccessful) {
@@ -155,7 +169,7 @@ object ShortioSdk {
     /**
      * handleIntent() method is used handle the intent and it returns UrlComponents
      * Parameters: intent of type Intent
-     * Returns: UrlComponents which includes scheme, host, path, destibnationUrl, etc.
+     * Returns: UrlComponents which includes scheme, host, path, destinationUrl, etc.
      */
     suspend fun handleIntent(intent: Intent): UrlComponents? {
         val uri = intent.data ?: return null
@@ -185,41 +199,32 @@ object ShortioSdk {
     /**
      * handleClick() is used to track the click
      * Parameters: It takes uriString of type String as parameter.
-     * Returns String
+     * Returns the redirect target, or null if there is none or the request failed.
      */
-    suspend fun handleClick(uriString: String): String? {
-        return try {
-            val urlString = when {
-                uriString.contains("utm_medium=android", ignoreCase = true) -> uriString
-                uriString.contains("?") -> "$uriString&utm_medium=android"
-                else -> "$uriString?utm_medium=android"
+    suspend fun handleClick(uriString: String): String? = withContext(Dispatchers.IO) {
+        try {
+            val uri = Uri.parse(uriString)
+            val urlString = if (uri.getQueryParameter("utm_medium") != null) {
+                uriString
+            } else {
+                uri.buildUpon().appendQueryParameter("utm_medium", "android").build().toString()
             }
 
-            val url = URL(urlString)
-            val connection = withContext(Dispatchers.IO) {
-                url.openConnection() as HttpURLConnection
-            }
+            val connection = URL(urlString).openConnection() as HttpURLConnection
 
             connection.requestMethod = "HEAD"
             connection.instanceFollowRedirects = false
 
             connection.connect()
 
-            println("Response Headers:")
-            for ((key, value) in connection.headerFields) {
-                if (key != null && value != null) {
-                    println("  $key: ${value.joinToString()}")
-                }
-            }
-
             val redirectedUrl = connection.getHeaderField("Location")
 
             connection.disconnect()
 
-            redirectedUrl ?: "Not Found"
+            redirectedUrl
 
         } catch (e: Exception) {
-            println("Network error: ${e.localizedMessage}")
+            Log.e("ShortioSdk", "handleClick failed", e)
             null
         }
     }
@@ -255,7 +260,7 @@ object ShortioSdk {
 
             SecureResult(securedOriginalURL, securedShortUrl)
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("ShortioSdk", "createSecure failed", e)
             throw e
         }
     }
@@ -298,20 +303,23 @@ object ShortioSdk {
                 "${it.first}=${URLEncoder.encode(it.second, "UTF-8")}"
             }
 
-            val finalUrl = "https://$finalDomain/.shortio/conversion?$queryString"
+            if (finalDomain.isNullOrEmpty()) {
+                Log.e("ShortioSdk", "trackConversion needs a domain; call initialize() first")
+                return@withContext false
+            }
 
-            val client = OkHttpClient()
+            val finalUrl = "https://$finalDomain/.shortio/conversion?$queryString"
 
             val request = Request.Builder()
                 .url(finalUrl)
                 .get()
                 .build()
 
-            client.newCall(request).execute().use { response ->
+            httpClient.newCall(request).execute().use { response ->
                 return@withContext response.isSuccessful
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("ShortioSdk", "createSecure failed", e)
             throw e
         }
     }
