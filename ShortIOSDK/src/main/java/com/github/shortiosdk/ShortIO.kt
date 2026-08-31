@@ -67,7 +67,7 @@ object ShortioSdk {
      */
     fun isSdkInitialized(): Boolean {
         if (!isInitialized) {
-            throw IllegalStateException("SDK is not initialized. Please initialize the SDk before using it.")
+            throw IllegalStateException("SDK is not initialized. Please initialize the SDK before using it.")
         }
         return true
     }
@@ -189,9 +189,7 @@ object ShortioSdk {
 
         val host = uri.host ?: return null
 
-        val shortioClidUrl = withContext(Dispatchers.IO) {
-            handleClick(uri.toString())
-        }
+        val shortioClidUrl = handleClick(uri.toString())
         clid = shortioClidUrl.let { it?.let { urlString -> extractClidFromUrl(urlString) } ?: "" }
 
         val destinationUrl = shortioClidUrl?.let { removeUtmParams(it) }
@@ -278,7 +276,7 @@ object ShortioSdk {
 
     /**
      * trackConversion() method is used to track the conversion.
-     * parameters: originalURL: String, clid: String, conversionId: String? = nil
+     * parameters: clid: String? = null, domain: String? = null, conversionId: String? = null
      * conversionId can be 'signup', 'purchase', 'download', etc.
      * Returns: Result Boolean based on status code
      */
@@ -330,8 +328,8 @@ object ShortioSdk {
                 return@withContext response.isSuccessful
             }
         } catch (e: Exception) {
-            Log.e("ShortioSdk", "createSecure failed", e)
-            throw e
+            Log.e("ShortioSdk", "trackConversion failed", e)
+            return@withContext false
         }
     }
 }

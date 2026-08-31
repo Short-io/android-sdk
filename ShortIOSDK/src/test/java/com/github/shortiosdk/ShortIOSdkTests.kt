@@ -160,6 +160,14 @@ class ShortIOSdkTests {
     }
 
     @Test
+    fun trackConversionReportsFailureRatherThanThrowingOnTransportError() = runTest {
+        initialized()
+        stub.failWith(java.io.IOException("no route to host"))
+
+        assertEquals(false, ShortioSdk.trackConversion(conversionId = "purchase"))
+    }
+
+    @Test
     fun outOfRangeParametersAreRejectedAtConstruction() {
         assertThrows(IllegalArgumentException::class.java) {
             ShortIOParameters("https://example.com", clicksLimit = 0)

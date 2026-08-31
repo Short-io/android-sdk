@@ -137,7 +137,7 @@ thread {
     }
 }       
 ```
-**Note**: Deprecated: `createShortLink`(apiKey, params) is still supported for backward compatibility but is no longer recommended for use. Use `createShortLink(params)` instead.
+**Note**: Deprecated: `createShortLink(params, apiKey)` is still supported for backward compatibility but is no longer recommended for use. Use `createShortLink(params)` instead.
 
 ## 📄 API Parameters
 
@@ -146,7 +146,7 @@ The `ShortIOParameters` struct is used to define the details of the short link y
 
 | Parameter           | Type        | Required  | Description                                                  |
 | ------------------- | ----------- | --------  | ------------------------------------------------------------ |
-| `domain`            | `String`    | ✅ (Deprecated)        | Your Short.io domain (e.g., `example.short.gy`). ⚠️ Deprecated. No longer required — inferred from API key. May be removed in future versions.              |
+| `domain`            | `String?`   | ❌ (Deprecated)        | Your Short.io domain (e.g., `example.short.gy`). ⚠️ Deprecated. Optional — when null or blank, the domain passed to `initialize()` is used.              |
 | `originalURL`       | `String`    | ✅       | The original URL to be shortened                             |
 | `cloaking`          | `Boolean`   | ❌        | If `true`, hides the destination URL from the user           |
 | `password`          | `String`    | ❌        | Password to protect the short link                           |
@@ -334,17 +334,14 @@ Track conversions for your short links to measure campaign effectiveness. The SD
 
 ```kotlin
 CoroutineScope(Dispatchers.IO).launch {
-    try {
-        val res = ShortioSdk.trackConversion(
-            domain: "https://{your_domain}", // ⚠️ Deprecated (optional):
-            clid: "your_clid", // ⚠️ Deprecated (optional):
-            conversionId: "your_conversionID" (optional)
-        )
-        // conversionId can be 'signup', 'purchase', 'download', etc.
-        Log.d("Handle Conversion Tracking", "Handle Conversion Tracking: $res")
-    } catch (e: Exception) {
-        Log.e("Handle Conversion Tracking", "Error calling trackConversion", e)
-    }
+    // All three are optional. clid falls back to the one captured by handleIntent,
+    // domain to the one passed to initialize(). Returns false if tracking failed.
+    val res = ShortioSdk.trackConversion(
+        clid = "your_clid",
+        domain = "example.short.gy",
+        conversionId = "purchase" // e.g. 'signup', 'purchase', 'download'
+    )
+    Log.d("Conversion Tracking", "tracked: $res")
 }
 ```
 
