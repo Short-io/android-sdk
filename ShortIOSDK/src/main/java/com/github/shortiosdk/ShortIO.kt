@@ -213,7 +213,8 @@ object ShortioSdk {
     suspend fun handleClick(uriString: String): String? = withContext(Dispatchers.IO) {
         try {
             val uri = Uri.parse(uriString)
-            val urlString = if (uri.getQueryParameter("utm_medium") != null) {
+            val alreadyTagged = uri.getQueryParameter("utm_medium").equals("android", ignoreCase = true)
+            val urlString = if (alreadyTagged) {
                 uriString
             } else {
                 uri.buildUpon().appendQueryParameter("utm_medium", "android").build().toString()

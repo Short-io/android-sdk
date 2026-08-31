@@ -59,6 +59,18 @@ class HandleClickTests {
     }
 
     @Test
+    fun aCampaignMediumDoesNotSuppressTheAndroidTag() = runTest {
+        server.enqueue(redirectTo("https://example.com/dest"))
+
+        ShortioSdk.handleClick(server.url("/abc?utm_source=x&utm_medium=cpc").toString())
+
+        assertEquals(
+            "/abc?utm_source=x&utm_medium=cpc&utm_medium=android",
+            server.takeRequest().path
+        )
+    }
+
+    @Test
     fun theLocationHeaderIsReturnedAsTheDestination() = runTest {
         server.enqueue(redirectTo("https://example.com/dest"))
 
