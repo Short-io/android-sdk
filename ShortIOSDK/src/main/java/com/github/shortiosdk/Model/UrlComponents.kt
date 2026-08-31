@@ -7,5 +7,5 @@ data class UrlComponents(
     val query: String?,
     val fragment: String?,
     val fullUrl: String,
-    val destinationUrl: String?
+    val destinationUrl: String? = null
 )
