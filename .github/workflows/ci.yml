@@ -123,3 +123,17 @@ jobs:
             || { echo "::error::No AAR in the published artifacts."; exit 1; }
           test -n "$(find "$DIR" -name '*.pom' -print -quit)" \
             || { echo "::error::No POM in the published artifacts."; exit 1; }
+
+  # The ruleset requires a check named `test`; the jobs above report under their
+  # own names. always() so a failed job still reports this check.
+  test:
+    name: test
+    needs: [unit-test, instrumentation-compile, jitpack-publish]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: |
+          [ "${{ needs.unit-test.result }}" = "success" ] \
+            && [ "${{ needs.instrumentation-compile.result }}" = "success" ] \
+            && [ "${{ needs.jitpack-publish.result }}" = "success" ]
