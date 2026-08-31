@@ -1,32 +1,30 @@
 package com.github.shortiosdk.Helpers
 
-import okhttp3.OkHttpClient
-import okhttp3.Request
+import android.net.Uri
+import android.util.Log
 
 
-fun HandleClick(uri: String): String? {
-    val client = OkHttpClient()
-
-    val url = when {
-        uri.contains("utm_medium=android", ignoreCase = true) -> uri
-        uri.contains("?") -> "$uri&utm_medium=android"
-        else -> "$uri?utm_medium=android"
-    }
-
-    val request = Request.Builder()
-        .url(url)
-        .addHeader("accept", "application/json")
-        .build()
-
+fun extractClidFromUrl(urlString: String): String? {
     return try {
-        client.newCall(request).execute().use { response ->
-            if (response.isSuccessful) {
-                response.code.toString()
-            } else {
-                "Link is not Valid"
+        val uri = Uri.parse(urlString)
+        uri.getQueryParameter("clid")
+    } catch (e: Exception) {
+        Log.e("ShortioSdk", "could not read clid from $urlString", e)
+        null
+    }
+}
+
+fun removeUtmParams(url: String): String {
+    val uri = Uri.parse(url)
+    val builder = uri.buildUpon().clearQuery()
+
+    uri.queryParameterNames
+        .filter { !it.startsWith("utm_", ignoreCase = true) }
+        .forEach { key ->
+            uri.getQueryParameters(key)?.forEach { value ->
+                builder.appendQueryParameter(key, value)
             }
         }
-    } catch (e: Exception) {
-        e.toString()
-    }
+
+    return builder.build().toString()
 }

@@ -1,0 +1,3 @@
+# Without this JitPack starts on 11 and downloads 17 mid-build.
+jdk:
+  - openjdk17

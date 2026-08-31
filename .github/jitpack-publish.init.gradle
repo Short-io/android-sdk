@@ -1,0 +1,21 @@
+// Mirrors the maven-publish injection JitPack performs, so CI can rehearse a release.
+// singleVariant must be set as the plugin applies; the component exists only after evaluation.
+allprojects { project ->
+    project.plugins.withId('com.android.library') {
+        project.android.publishing { singleVariant('release') }
+        project.apply plugin: 'maven-publish'
+
+        project.afterEvaluate {
+            project.publishing {
+                publications {
+                    release(MavenPublication) {
+                        from project.components.release
+                        groupId = project.findProperty('group')
+                        artifactId = 'android-sdk'
+                        version = project.findProperty('version')
+                    }
+                }
+            }
+        }
+    }
+}

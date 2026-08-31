@@ -1,6 +1,8 @@
 
 # ShortIOSDK for Android
 
+[![CI](https://github.com/Short-io/android-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/Short-io/android-sdk/actions/workflows/ci.yml)
+
 This SDK allows you to create short links using the [Short.io](https://short.io/) API based on a public API key and custom parameters. It also supports Android deep linking integration.
 
 ## ✨ Features
@@ -52,7 +54,7 @@ It will be:
 ```kotlin
 dependencies {
 	implementation("com.github.User:Repo:Tag") // Example
-	implementation("com.github.Short-io:android-sdk:v1.0.4") // Use this
+	implementation("com.github.Short-io:android-sdk:v1.0.9") // Use this
 }
 ```
 ### 3. Sync the Project
@@ -80,6 +82,27 @@ import com.github.shortiosdk.ShortioSdk
 
 ### 🔗 SDK Usage
 
+#### Initialize the SDK
+
+To start using ShortioSdk, you need to initialize it early in your app lifecycle, preferably in your Activity's onCreate() method or in your custom Application class.
+
+Example: Initialize in Activity
+
+```kotlin
+override fun onCreate() {
+    super.onCreate()
+    ShortioSdk.initialize(apiKey, domain)
+}
+```
+* apiKey: Your API key string for SDK initialization.
+* domain: The default domain to use for URL shortening.
+
+### 💡 How It Works
+
+The app demonstrates:
+
+#### ✅ Generating Short Links
+
 ```kotlin
 import com.github.shortiosdk.ShortioSdk
 import com.github.shortiosdk.ShortIOParameters
@@ -87,7 +110,6 @@ import com.github.shortiosdk.ShortIOResult
 
 try {
     val params = ShortIOParameters(
-      domain = "your_domain", // Replace with your Short.io domain
       originalURL = "your_originalURL" // Replace with your Short.io domain
     )
 } catch (e: Exception) {
@@ -95,20 +117,19 @@ try {
 }
 ```
 
-**Note**: Both `domain` and `originalURL` are the required parameters. You can also pass optional parameters such as `path`, `title`, `utmParameters`, etc.
+**Note**: Only the `originalURL` is the required parameter as `domain` is passed in the initialize method of SDK. You can also pass optional parameters such as `path`, `title`, `utmParameters`, etc.
 
 ```kotlin
-val apiKey = "your_public_apiKey" // Replace with your Short.io Public API Key
 
 thread {
     try {
-        when (val result = ShortioSdk.shortenUrl(apiKey, params)) {
+        when (val result = ShortioSdk.createShortLink(params)) {
             is ShortIOResult.Success -> {
-                println("Shortened URL: ${result.data.shortURL}")
+                Log.d("ShortIOResult","Shortened URL: ${result.data.shortURL}")
             }
             is ShortIOResult.Error -> {
                 val error = result.data
-                println("Error ${error.statusCode}: ${error.message} (code: ${error.code})")
+                Log.d("ShortIOResult","Error ${error.statusCode}: ${error.message} (code: ${error.code})")
             }
         }
     } catch (e: Exception) {
@@ -116,6 +137,8 @@ thread {
     }
 }       
 ```
+**Note**: Deprecated: `createShortLink(params, apiKey)` is still supported for backward compatibility but is no longer recommended for use. Use `createShortLink(params)` instead.
+
 ## 📄 API Parameters
 
 The `ShortIOParameters` struct is used to define the details of the short link you want to create. Below are the available parameters:
@@ -123,8 +146,8 @@ The `ShortIOParameters` struct is used to define the details of the short link y
 
 | Parameter           | Type        | Required  | Description                                                  |
 | ------------------- | ----------- | --------  | ------------------------------------------------------------ |
-| `domain`            | `String`    | ✅        | Your Short.io domain (e.g., `example.short.gy`)              |
-| `originalURL`       | `String`    | ✅        | The original URL to be shortened                             |
+| `domain`            | `String?`   | ❌ (Deprecated)        | Your Short.io domain (e.g., `example.short.gy`). ⚠️ Deprecated. Optional — when null or blank, the domain passed to `initialize()` is used.              |
+| `originalURL`       | `String`    | ✅       | The original URL to be shortened                             |
 | `cloaking`          | `Boolean`   | ❌        | If `true`, hides the destination URL from the user           |
 | `password`          | `String`    | ❌        | Password to protect the short link                           |
 | `redirectType`      | `Int`       | ❌        | Type of redirect (e.g., 301, 302)                            |
@@ -241,7 +264,7 @@ keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -sto
 
 3. Tap on **“Add link”** under the **Open by Default** section.
 
-4. Add your URL and make sure to enable the checkbox for your link.
+4. Add your URL if not added and make sure to enable the checkbox for your link.
 
 ### 🔗 Step 4: Open the App Using a Deep Link
 
@@ -253,6 +276,8 @@ keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -sto
 
 ### 🧭 Step 5: Handle Incoming URLs with onNewIntent() Method
 
+To retrieve the original URL from Short.io links in your Android app, you can handle incoming intents in onNewIntent(), which allows your activity to process links that are opened while it is already running.
+
 1. Open your main activity file (e.g., MainActivity.kt).
 
 2. Override the `onNewIntent()` method to receive new intents when the activity is already running:
@@ -260,23 +285,67 @@ keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -sto
 ```kotlin
 override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
-    val result = ShortioSdk.handleIntent(intent)
-    Log.d("New Intent", "Host: ${result?.host}, Path: ${result?.path}")
+    lifecycleScope.launch {
+        val result = ShortioSdk.handleIntent(intent)
+        // Access the original URL
+        val originalUrl = result?.destinationUrl
+        Log.d("New Intent", 
+            "Host: ${result?.host},
+            Path: ${result?.path},
+            Original URL: $originalUrl"
+        )
+    }
 }
 ```
 
-3. In the same activity, also handle the initial intent inside the `onCreate()` method:
+3. In the same activity, To handle the initial intent inside the `onCreate()` method:
 
 ```kotlin
 override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    lifecycleScope.launch {
         val result = ShortioSdk.handleIntent(intent)
-    Log.d("New Intent", "Host: ${result?.host}, Path: ${result?.path}")
+        // Access the original URL
+        val originalUrl = result?.destinationUrl
+        Log.d("New Intent", 
+            "Host: ${result?.host},
+            Path: ${result?.path},
+            Original URL: $originalUrl"
+        )
+    }
 }
 ```
 
+### 🔐 Secure Short Link
 
-### ✅ Final Checklist
+If you want to encrypt the original URL before shortening it. For privacy or security reasons — the SDK provides a utility function called createSecure. This function encrypts the original URL using AES-GCM and returns a secured URL with a separate decryption key.
+
+```kotlin
+val originalURL = "your_original_URL"
+val result = ShortioSdk.createSecure(originalURL)
+Log.d("SecureURL", "RESULT: ${result}")
+Log.d("securedOriginalURL", "URL: ${result.securedOriginalURL}")
+Log.d("securedShortUrl", "URL: ${result.securedShortUrl}")
+```
+
+### 🔄 Conversion Tracking
+
+Track conversions for your short links to measure campaign effectiveness. The SDK provides a simple method to record conversions.
+
+```kotlin
+CoroutineScope(Dispatchers.IO).launch {
+    // All three are optional. clid falls back to the one captured by handleIntent,
+    // domain to the one passed to initialize(). Returns false if tracking failed.
+    val res = ShortioSdk.trackConversion(
+        clid = "your_clid",
+        domain = "example.short.gy",
+        conversionId = "purchase" // e.g. 'signup', 'purchase', 'download'
+    )
+    Log.d("Conversion Tracking", "tracked: $res")
+}
+```
+
+### ✅ Final Checklist for Deep Linking
 
 * App is signed with the correct keystore.
 

@@ -1,6 +1,5 @@
 package com.github.shortiosdk
 
-
 data class ShortIOParameters(
     val originalURL: String,
     val cloaking: Boolean? = null,
@@ -30,7 +29,7 @@ data class ShortIOParameters(
     val integrationFB: String? = null,
     var integrationGA: String? = null,
     val integrationGTM: String? = null,
-    val domain: String,
+    var domain: String? = null,
     val folderId: String? = null
 ) {
     init {
