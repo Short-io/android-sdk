@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main, short-io-sdk]
+
+# Least privilege: nothing here needs more than reading the checkout.
+permissions:
+  contents: read
+
+# Cancel superseded PR runs; branch pushes finish so the badge never shows a cancellation.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # AGP 8.10 requires 17. Keep in step with jitpack.yml.
+  JAVA_VERSION: "17"
+
+jobs:
+  unit-test:
+    name: unit tests
+    runs-on: ubuntu-latest
+    # Otherwise a wedged daemon runs to the 360-minute default.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96 # v4.4.1
+
+      # Robolectric caches android-all jars outside ~/.gradle, so they need their own key.
+      - name: Cache Robolectric runtimes
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ runner.os }}-${{ hashFiles('**/gradle/libs.versions.toml', '**/src/test/resources/robolectric.properties') }}
+          restore-keys: robolectric-${{ runner.os }}-
+
+      - name: Run unit tests
+        run: ./gradlew --no-daemon testDebugUnitTest
+
+      # Lint ships with AGP and this module is clean, so any finding is a regression.
+      - name: Lint
+        run: ./gradlew --no-daemon lint
+
+      - name: Upload reports
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: unit-test-reports
+          path: |
+            ShortIOSDK/build/reports/tests/
+            ShortIOSDK/build/reports/lint-results-*.html
+            ShortIOSDK/build/test-results/
+          retention-days: 7
+
+  # Type-checks androidTest without an emulator.
+  instrumentation-compile:
+    name: compile instrumented tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96 # v4.4.1
+
+      - name: Assemble instrumented test APK
+        run: ./gradlew --no-daemon assembleAndroidTest
+
+  # JitPack publishes with -xtest -xlint, so this is the only place a broken
+  # publish surfaces before tag time.
+  jitpack-publish:
+    name: jitpack publish rehearsal
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96 # v4.4.1
+
+      - name: Publish to a local repository
+        run: |
+          ./gradlew --no-daemon -I .github/jitpack-publish.init.gradle clean \
+            -Pgroup=com.github.Short-io \
+            -Pversion=ci-${{ github.sha }} \
+            -xtest -xlint \
+            publishToMavenLocal
+
+      - name: Verify the AAR and POM were produced
+        run: |
+          set -euo pipefail
+          DIR=~/.m2/repository/com/github/Short-io/android-sdk/ci-${{ github.sha }}
+          if [ ! -d "$DIR" ]; then
+            echo "::error::Nothing was published to $DIR"
+            find ~/.m2/repository/com/github -maxdepth 4 -type d || true
+            exit 1
+          fi
+          ls -l "$DIR"
+          test -n "$(find "$DIR" -name '*.aar' -print -quit)" \
+            || { echo "::error::No AAR in the published artifacts."; exit 1; }
+          test -n "$(find "$DIR" -name '*.pom' -print -quit)" \
+            || { echo "::error::No POM in the published artifacts."; exit 1; }

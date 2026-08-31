@@ -1,6 +1,8 @@
 
 # ShortIOSDK for Android
 
+[![CI](https://github.com/Short-io/android-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/Short-io/android-sdk/actions/workflows/ci.yml)
+
 This SDK allows you to create short links using the [Short.io](https://short.io/) API based on a public API key and custom parameters. It also supports Android deep linking integration.
 
 ## ✨ Features
